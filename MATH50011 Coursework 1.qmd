@@ -1,5 +1,5 @@
 ---
-title: "Can Body Measurements Reliably Distinguish Penguin Species?"
+title: "Are Male Gentoo Penguins Significantly Heavier Than Females?"
 author: "CID: 02385539"
 date: "2026-02-09"
 format:
@@ -14,20 +14,24 @@ format:
     linestretch: 1.15
     keep-tex: false
 execute: 
-  echo: false    # Hides code in final PDF (cleaner)
-  warning: false # Hides error messages
+  echo: false
+  warning: false
 ---
 
 # Why This Question
 
-I stumbled upon the Palmer Penguins dataset (1, reference datset as instructed to on their website) a few months ago while reading a book on Machine Learning (2, reference interpretable ML book). While exploring it alongside the author, I found that not only is it one of the cutest datasets, but also one of the most beginner friendly for data cleaning, exploration, and interpretation (and I happen toe be a beginner). It contains the species, sex, body mass, bill length, and more on 344 penguins (333 after cleaning), which is plenty for calculating rough estimators of the different (continuous) features. Consequently, I selected it to be the focal point of this work.
+I stumbled upon the Palmer Penguins dataset[^1] a few months ago while reading a book on Machine Learning. While exploring it alongside the author, I found that not only is it one of the cutest datasets, but also one of the most beginner friendly for data cleaning, exploration, and interpretation (and I happen to be a beginner). It contains the species, sex, body mass, bill length, and more on 344 penguins (333 after cleaning), which is big enough to satisfy the Central Limit Theorem but small enough that I can easily calculate estimators manually or visualise every datapoint without overplotting.
 
-When exploring the data, I discovered that a plot of the body mass distribution of Gentoo penguins (one of the three species in the dataset) was not a bell curve as expected, but rather a (bimodal) double-humped curve. After colouring the Gentoo penguin data according to sex, it became clear that this was really the amalgamation of two normal distributions, a phenomenon I found fascinating (see Figure 1). I wondered then: within a penguin species, is the size difference between the two sexes statistically significant enough to be modeled parametrically?
+[^1]: Horst AM, Hill AP, Gorman KB (2020). palmerpenguins: Palmer Archipelago (Antarctica) penguin data. R package version 0.1.0. https://allisonhorst.github.io/palmerpenguins/. doi: 10.5281/zenodo.3960218.
+
+Moreover, when exploring the data, I discovered a distinct bimodality in the body mass distribution of Gentoo penguins (one of the three species in the dataset). Rather than being a bell curve, as expected, the distribution has a double-hump. After colouring the Gentoo penguin data according to sex, it became clear that this was really the amalgamation of two normal distributions, a phenomenon I found fascinating (see @fig-bimodality). I wondered then: within a penguin species, is the size difference between the two sexes statistically significant enough to be modeled parametrically?[^2]
+
+[^2]: The full reproducible code repository is available at: github.com/recursivechockler/MATH50011-Coursework-1.
 
 ```{r}
 #| label: fig-bimodality
 #| fig-cap: "Left: The initial bimodal distribution. Right: The same data separated by sex. (Note: Y-axes fixed to same scale for comparison)"
-#| fig-height: 3
+#| fig-height: 2.5
 #| fig-pos: "H"
 #| warning: false
 
@@ -35,16 +39,12 @@ library(tidyverse)
 library(palmerpenguins)
 library(patchwork)
 
-# 1. Filter Data
 gentoo_data <- penguins %>% 
   filter(species == "Gentoo") %>% 
   drop_na(body_mass_g, sex)
 
-# 2. Define a common Y-axis limit so heights are comparable
-# (The highest peak in the data is around 0.0013, so 0.0015 covers everything)
 common_limits <- coord_cartesian(ylim = c(0, 0.0015))
 
-# 3. Create "Initial View"
 plot_initial <- ggplot(gentoo_data, aes(x = body_mass_g)) +
   geom_density(fill = "grey70", alpha = 0.7) +
   common_limits +  # Apply common scale
@@ -54,7 +54,6 @@ plot_initial <- ggplot(gentoo_data, aes(x = body_mass_g)) +
        y = "Density") +
   theme_minimal()
 
-# 4. Create "Resolved View"
 plot_resolved <- ggplot(gentoo_data, aes(x = body_mass_g, fill = sex)) +
   geom_density(alpha = 0.5) +
   scale_fill_manual(values = c("darkorange", "cyan4")) +
@@ -65,10 +64,9 @@ plot_resolved <- ggplot(gentoo_data, aes(x = body_mass_g, fill = sex)) +
        y = "") +
   theme_minimal() +
   theme(legend.position = "bottom",
-        axis.text.y = element_blank(), # Hide numbers on right plot
+        axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
 
-# 5. Stitch together
 plot_initial + plot_resolved
 ```
 
@@ -76,106 +74,77 @@ plot_initial + plot_resolved
 
 ## Derivation of MLE
 
-We choose to treat the body mass measurements $x_1, \dots, x_n$ of a specific sex of Gentoo penguins as independent observations. We model these as:
+Another convenience of this dataset is the ease with which one can assume i.i.d. observations (with the concession that family-related penguins would likely share similar characteristics). Hence, I chose to treat the body mass measurements $x_1, \dots, x_n$ of Gentoo penguins as independent and normally distributed:
 
 $$X_i \sim \mathcal{N}(\mu, \sigma^2), \quad i = 1, \dots, n$$
 
 where the parameters are $\boldsymbol{\theta} = (\mu, \sigma^2)^T \in \mathbb{R} \times (0, \infty)$.
 
-**To work out the MLE:**
-First, note that the probability density function (PDF) of a single observation $X_i$ is:
-$$f(x_i; \mu, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left( -\frac{(x_i - \mu)^2}{2\sigma^2} \right)$$
+**To work out the MLE:** First, note that the probability density function (PDF) of a single observation $X_i$ is: $$f(x_i; \mu, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left( -\frac{(x_i - \mu)^2}{2\sigma^2} \right)$$
 
-Therefore, the Likelihood function $L(\boldsymbol{\theta})$ is the product of the individual PDFs:
-$$L(\mu, \sigma^2) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left( -\frac{(x_i - \mu)^2}{2\sigma^2} \right)$$
+Therefore, the Likelihood function $L(\boldsymbol{\theta})$ is the product of the individual PDFs: $$L(\mu, \sigma^2) = \prod_{i=1}^{n} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left( -\frac{(x_i - \mu)^2}{2\sigma^2} \right)$$
 
-Simplifying this expression:
-$$L(\mu, \sigma^2) = (2\pi\sigma^2)^{-n/2} \exp\left( -\frac{1}{2\sigma^2} \sum_{i=1}^{n} (x_i - \mu)^2 \right)$$
+Simplifying this expression: $$L(\mu, \sigma^2) = (2\pi\sigma^2)^{-n/2} \exp\left( -\frac{1}{2\sigma^2} \sum_{i=1}^{n} (x_i - \mu)^2 \right)$$
 
-Taking logs of both sides gives the Log-Likelihood function, which we denote as $\ell(\mu, \sigma^2)$:
-$$\ell(\mu, \sigma^2) = -\frac{n}{2}\log(2\pi) - \frac{n}{2}\log(\sigma^2) - \frac{1}{2\sigma^2} \sum_{i=1}^{n} (x_i - \mu)^2$$
+Taking logs of both sides gives the Log-Likelihood function, which we denote as $\ell(\mu, \sigma^2)$: $$\ell(\mu, \sigma^2) = -\frac{n}{2}\log(2\pi) - \frac{n}{2}\log(\sigma^2) - \frac{1}{2\sigma^2} \sum_{i=1}^{n} (x_i - \mu)^2$$
 
 To find the Maximum Likelihood Estimators, we differentiate with respect to $\mu$ and $\sigma^2$, equate to 0, and solve:
 
-1. **For $\mu$:**
-$$\frac{\partial \ell}{\partial \mu} = \frac{1}{\sigma^2} \sum_{i=1}^{n} (x_i - \mu) = 0 \implies \sum x_i - n\hat{\mu} = 0 \implies \hat{\mu}_{MLE} = \frac{1}{n}\sum_{i=1}^{n} x_i = \bar{x}$$
+1.  **For** $\mu$: $$\frac{\partial \ell}{\partial \mu} = \frac{1}{\sigma^2} \sum_{i=1}^{n} (x_i - \mu) = 0 \implies \sum x_i - n\hat{\mu} = 0 \implies \hat{\mu}_{MLE} = \frac{1}{n}\sum_{i=1}^{n} x_i = \bar{x}$$
 
-2. **For $\sigma^2$:**
-$$\frac{\partial \ell}{\partial \sigma^2} = -\frac{n}{2\sigma^2} + \frac{1}{2(\sigma^2)^2} \sum_{i=1}^{n} (x_i - \mu)^2 = 0 \implies \hat{\sigma}^2_{MLE} = \frac{1}{n} \sum_{i=1}^{n} (x_i - \hat{\mu})^2$$
+2.  **For** $\sigma^2$: $$\frac{\partial \ell}{\partial \sigma^2} = -\frac{n}{2\sigma^2} + \frac{1}{2(\sigma^2)^2} \sum_{i=1}^{n} (x_i - \mu)^2 = 0 \implies \hat{\sigma}^2_{MLE} = \frac{1}{n} \sum_{i=1}^{n} (x_i - \hat{\mu})^2$$
 
 Now, while the MLE for $\hat{\mu}$ is unbiased, the MLE for $\hat{\sigma^2}$ is biased (as proven in lectures).
 
-To determine if our estimator $\hat{\mu} = \bar{X}$ is efficient, we compare its variance to the Cramér-Rao Lower Bound (CRLB).
+To determine if our estimator $\hat{\mu} = \bar{X}$ is efficient, we compare its variance to the Cramér-Rao Lower Bound.
 
-**1. Fisher Information ($I_n(\mu)$):**
-The log-likelihood function derived previously is:
-$$\ell(\mu, \sigma^2) = -\frac{n}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2} \sum_{i=1}^{n} (x_i - \mu)^2$$
+## Efficiency of Statistics
 
-We take the first and second partial derivatives with respect to $\mu$:
-$$\frac{\partial \ell}{\partial \mu} = \frac{1}{\sigma^2} \sum_{i=1}^{n} (x_i - \mu)$$
-$$\frac{\partial^2 \ell}{\partial \mu^2} = \frac{1}{\sigma^2} \sum_{i=1}^{n} (-1) = -\frac{n}{\sigma^2}$$
+**1. Fisher Information (**$I_n(\mu)$): The log-likelihood function derived previously is: $$\ell(\mu, \sigma^2) = -\frac{n}{2}\log(2\pi\sigma^2) - \frac{1}{2\sigma^2} \sum_{i=1}^{n} (x_i - \mu)^2$$
 
-The Fisher Information is defined as the negative expectation of the second derivative:
-$$I_n(\mu) = -E\left[ \frac{\partial^2 \ell}{\partial \mu^2} \right] = -E\left[ -\frac{n}{\sigma^2} \right] = \frac{n}{\sigma^2}$$
+We take the first and second partial derivatives with respect to $\mu$: $$\frac{\partial \ell}{\partial \mu} = \frac{1}{\sigma^2} \sum_{i=1}^{n} (x_i - \mu)$$ $$\frac{\partial^2 \ell}{\partial \mu^2} = \frac{1}{\sigma^2} \sum_{i=1}^{n} (-1) = -\frac{n}{\sigma^2}$$
 
-**2. The Cramér-Rao Lower Bound:**
-For an unbiased estimator, the lower bound for variance is the reciprocal of the Fisher Information:
-$$\text{CRLB} = \frac{1}{I_n(\mu)} = \frac{\sigma^2}{n}$$
+The Fisher Information is defined as the negative expectation of the second derivative: $$I_n(\mu) = -E\left[ \frac{\partial^2 \ell}{\partial \mu^2} \right] = -E\left[ -\frac{n}{\sigma^2} \right] = \frac{n}{\sigma^2}$$
 
-**3. Variance of our Estimator:**
-We calculate the variance of our MLE $\hat{\mu} = \bar{X}$:
-$$Var(\bar{X}) = Var\left( \frac{1}{n}\sum x_i \right) = \frac{1}{n^2} \sum Var(x_i) = \frac{1}{n^2} (n\sigma^2) = \frac{\sigma^2}{n}$$
+**2. The Cramér-Rao Lower Bound:** For an unbiased estimator, the lower bound for variance is the reciprocal of the Fisher Information: $$\text{CRLB} = \frac{1}{I_n(\mu)} = \frac{\sigma^2}{n}$$
 
-**Conclusion:**
-Since $Var(\hat{\mu}) = \text{CRLB}$, the estimator $\hat{\mu}_{MLE}$ is **efficient** and attains the Cramér-Rao Lower Bound.
+**3. Variance of our Estimator:** We calculate the variance of our MLE $\hat{\mu} = \bar{X}$: $$Var(\bar{X}) = Var\left( \frac{1}{n}\sum x_i \right) = \frac{1}{n^2} \sum Var(x_i) = \frac{1}{n^2} (n\sigma^2) = \frac{\sigma^2}{n}$$
 
-**4. Efficiency Check for Variance ($\hat{\sigma}^2_{MLE}$):**
+**Conclusion:** Since $Var(\hat{\mu}) = \text{CRLB}$, the estimator $\hat{\mu}_{MLE}$ is **efficient**.
+
+**4. Efficiency Check for Variance (**$\hat{\sigma}^2_{MLE}$):
 
 We repeat the process for the variance parameter $\sigma^2$.
 
-**A. Fisher Information ($I_n(\sigma^2)$):**
-First, differentiate the log-likelihood with respect to variance ($\sigma^2$):
-$$\frac{\partial \ell}{\partial \sigma^2} = -\frac{n}{2\sigma^2} + \frac{1}{2(\sigma^2)^2} \sum_{i=1}^{n} (x_i - \mu)^2$$
+**A. Fisher Information (**$I_n(\sigma^2)$) $$\frac{\partial \ell}{\partial \sigma^2} = -\frac{n}{2\sigma^2} + \frac{1}{2(\sigma^2)^2} \sum_{i=1}^{n} (x_i - \mu)^2$$
 
-Second derivative:
-$$\frac{\partial^2 \ell}{\partial (\sigma^2)^2} = \frac{n}{2(\sigma^2)^2} - \frac{1}{(\sigma^2)^3} \sum_{i=1}^{n} (x_i - \mu)^2$$
+$$\implies \frac{\partial^2 \ell}{\partial (\sigma^2)^2} = \frac{n}{2(\sigma^2)^2} - \frac{1}{(\sigma^2)^3} \sum_{i=1}^{n} (x_i - \mu)^2$$
 
-Taking the negative expectation (noting that $E[\sum(x_i-\mu)^2] = n\sigma^2$):
-$$I_n(\sigma^2) = -E\left[ \frac{n}{2\sigma^4} - \frac{1}{\sigma^6}(n\sigma^2) \right] = - \left( \frac{n}{2\sigma^4} - \frac{n}{\sigma^4} \right) = \frac{n}{2\sigma^4}$$
+Taking the negative expectation (noting that $E[\sum(x_i-\mu)^2] = n\sigma^2$): $$I_n(\sigma^2) = -E\left[ \frac{n}{2\sigma^4} - \frac{1}{\sigma^6}(n\sigma^2) \right] = - \left( \frac{n}{2\sigma^4} - \frac{n}{\sigma^4} \right) = \frac{n}{2\sigma^4}$$
 
-**B. The Cramér-Rao Lower Bound:**
-$$\text{CRLB}_{\sigma^2} = \frac{1}{I_n(\sigma^2)} = \frac{2\sigma^4}{n}$$
+**B. The Cramér-Rao Lower Bound:** $$\text{CRLB}_{\sigma^2} = \frac{1}{I_n(\sigma^2)} = \frac{2\sigma^4}{n}$$
 
-**C. Variance of the Estimator:**
-We know that for Normally distributed data, the sum of squares follows a Chi-Square distribution:
-$$\sum (x_i - \bar{x})^2 \sim \sigma^2 \chi^2_{n-1}$$
-Therefore, our estimator $\hat{\sigma}^2_{MLE} = \frac{1}{n}\sum(x_i - \bar{x})^2$ has variance:
-$$Var(\hat{\sigma}^2_{MLE}) = \frac{1}{n^2} Var(\sigma^2 \chi^2_{n-1}) = \frac{\sigma^4}{n^2} (2(n-1)) = \frac{2(n-1)\sigma^4}{n^2}$$
+**C. Variance of the Estimator:** We know that for Normally distributed data, the sum of squares follows a Chi-Square distribution: $$\sum (x_i - \bar{x})^2 \sim \sigma^2 \chi^2_{n-1}$$ Therefore, our estimator $\hat{\sigma}^2_{MLE} = \frac{1}{n}\sum(x_i - \bar{x})^2$ has variance: $$Var(\hat{\sigma}^2_{MLE}) = \frac{1}{n^2} Var(\sigma^2 \chi^2_{n-1}) = \frac{\sigma^4}{n^2} (2(n-1)) = \frac{2(n-1)\sigma^4}{n^2}$$
 
-**Conclusion:**
-Comparing the actual variance to the CRLB:
-$$\frac{2(n-1)\sigma^4}{n^2} \neq \frac{2\sigma^4}{n}$$
-The MLE for variance does **not** attain the CRLB for finite $n$. However, it is **asymptotically efficient**, as the ratio approaches 1 when $n \to \infty$:
-$$\lim_{n \to \infty} \frac{2(n-1)\sigma^4/n^2}{2\sigma^4/n} = 1$$
+**Conclusion:** Comparing the actual variance to the CRLB: $$\frac{2(n-1)\sigma^4}{n^2} \neq \frac{2\sigma^4}{n}$$ The MLE for variance does **not** attain the CRLB for finite $n$. However, it is **asymptotically efficient**, as the ratio approaches 1 when $n \to \infty$: $$\lim_{n \to \infty} \frac{2(n-1)\sigma^4/n^2}{2\sigma^4/n} = 1$$
 
-# **Application & Results**
+# Application & Results
 
-These estimators for $\hat{\mu}$ and $\hat{\sigma^2}$ are as follows^[R's `mean()` function was used to calculate the above mean MLEs, as the MLE for the mean is the sample average. However, R's `var()` function divides by $n-1$ rather than by $n$, making for an unbiased estimator. Hence, a helper function was written to calculate the MLE for the variance of the data through multiplying the result of this function by $n-1$ then dividing it by $n$.]:
+These estimators for $\hat{\mu}$ and $\hat{\sigma^2}$, as well as the true ${\sigma^2}$, are as follows[^3]:
+
+[^3]: R's `mean()` function was used to calculate the above mean MLEs, as the MLE for the mean is the sample average. However, R's `var()` function divides by $n-1$ rather than by $n$, making for an unbiased estimator. Hence, a helper function was written to calculate the MLE for the variance of the data through multiplying the result of this function by $n-1$ then dividing it by $n$.
 
 ```{r}
 #| label: calc-mle
 #| echo: false
 
-# 1. Separate the data
 gentoo_m <- penguins %>% filter(species == "Gentoo", sex == "male") %>% drop_na(body_mass_g)
 gentoo_f <- penguins %>% filter(species == "Gentoo", sex == "female") %>% drop_na(body_mass_g)
 
-# 2. Define a helper function for MLE Variance (multiply by (n-1)/n)
 var_mle <- function(x) {
   var(x) * (length(x) - 1) / length(x)
 }
 
-# 3. Calculate values dynamically
 n_m <- nrow(gentoo_m)
 mu_m <- mean(gentoo_m$body_mass_g)
 sig_m <- var_mle(gentoo_m$body_mass_g)
@@ -185,48 +154,167 @@ mu_f <- mean(gentoo_f$body_mass_g)
 sig_f <- var_mle(gentoo_f$body_mass_g)
 ```
 
-**For Gentoo Males ($n = `r n_m`$):**
-$$\hat{\mu}_{male} = `r round(mu_m, 2)` \text{ g}, \quad \hat{\sigma}^2_{male} = `r round(sig_m, 2)` \text{ g}$$
+**For Gentoo Males (**$n = `r n_m`$): $$\hat{\mu}_{m} = `r round(mu_m, 2)` \text{ g}, \quad \hat{\sigma}^2_{m} = `r round(sig_m, 2)` \text{ g}, \quad {\sigma}^2_{m} = `r round(var(gentoo_m$body_mass_g), 2)`$$
 
-**For Gentoo Females ($n = `r n_f`$):**
-$$\hat{\mu}_{female} = `r round(mu_f, 2)` \text{ g}, \quad \hat{\sigma}^2_{female} = `r round(sig_f, 2)` \text{ g}$$
+**For Gentoo Females (**$n = `r n_f`$): $$\hat{\mu}_{f} = `r round(mu_f, 2)` \text{ g}, \quad \hat{\sigma}^2_{f} = `r round(sig_f, 2)` \text{ g}, \quad {\sigma}^2_{f} = `r round(var(gentoo_f$body_mass_g), 2)`$$
 
-**Male:** `r round(var(gentoo_m$body_mass_g), 2)`, **Female:** `r round(var(gentoo_f$body_mass_g), 2)`
+In the following sections, I will investigate whether the difference in mean body mass between male and female Gentoo penguins is statistically significant. In these sections, I will use the sample mean to form my conclusions. As shown above, no other estimator could possibly be more precise, as the sample mean is both the maximum likelihood estimator of $\mu$ and hits the Cramér-Rao Lower Bound.
 
-These unbiased variances are larger than the MLEs, demonstrating the existence of bias in the latter.
+## Hypothesis Testing
 
--   **Hypothesis Test (Syllabus §7):** Perform a Two-Sample t-test (or Likelihood Ratio Test) to check if the difference in mean Culmen Depth between species is significant.
+To determine if the difference in body mass is statistically significant, we test the null hypothesis that there is no difference in mean body mass between the sexes against the alternative that a difference exists: $$H_0: \hat{\mu}_{male} - \hat\mu_{female} = 0$$ $$H_1: \hat\mu_{male} - \hat\mu_{female} \neq 0$$
 
--   **Confidence Region (Syllabus §6):** Plot the 95% Confidence Interval for your estimator.
+As seen above, this dataset is big enough that using the MLE for variance versus the unbiased variance will make little difference. As it is the standard for t-tests, I will be using the unbiased estimator. Also, it will guarentee that we do not underestimate the variance of the data, keeping the probability of a Type I error (a false positive) to a minimum.
 
--   **Visuals:**
+As $n \to \infty$, the estimator $\hat{\mu}$ is asymptotically Normal. Since our samples are independent, the difference between the sample means is also Normally distributed: $$(\hat{\mu}_{m} - \hat{\mu}_{f}) \sim \mathcal{N}\left( \delta, \frac{\sigma^2_m}{n_m} + \frac{\sigma^2_f}{n_f} \right)$$
 
-# Critical Use of AI (0.5 Pages)
+Where $\delta = \hat\mu_{male} - \hat\mu_{female}$.
 
-# Discussion (0.5)
+### Confidence Interval for the Difference in Mass
 
-# References (DEPRECATED -- reference as you go along using footnotes then include this photo at the end of the discussion part)
-
-![A solitary penguin heading towards the mountains (Source: Werner Herzog's 'Encounters at the End of the World')](penguin_mountain.jpg){#fig-penguin fig-align="center" width="70%"}
-
-# Data Analysis
+We aim to derive a $(1-\alpha)$ Confidence Interval for the true difference in means $\delta$. To do this, we use the pivotal quantity based on the difference of the sample means. Since the sample sizes are large, we can apply the Central Limit Theorem to approximate the distribution as Normal:$$1 - \alpha = P\left(-c_{\alpha/2} < \frac{(\hat{\mu}_m - \hat{\mu}_f) - \delta}{\sqrt{\frac{\sigma^2_m}{n_m} + \frac{\sigma^2_f}{n_f}}} < c_{\alpha/2}\right)$$Rearranging this inequality to isolate $\delta$, we get the formula for the confidence interval:$$(\hat{\mu}_m - \hat{\mu}_f) \pm c_{\alpha/2} \sqrt{\frac{\sigma_m^2}{n_m} + \frac{\sigma_f^2}{n_f}}$$
 
 ```{r}
-#| label: load-data
-#| include: false
+alpha <- 0.05
+lhs <- 1-alpha
+half_alpha <- alpha/2
+z_score <- qnorm(1 - half_alpha)
 
-library(tidyverse)
-library(palmerpenguins)
-data("penguins")
-df <- penguins %>% drop_na()
+S2_m <- var(gentoo_m$body_mass_g)
+S2_f <- var(gentoo_f$body_mass_g)
+
+se_diff <- sqrt((S2_m / n_m) + (S2_f / n_f))
+
+mean_diff <- mu_m - mu_f
+
+ci_lower <- mean_diff - z_score * se_diff
+ci_upper <- mean_diff + z_score * se_diff
 ```
+
+Plugging in our known values for $\hat{\mu}_{m}, \hat{\mu}_{f}, \sigma_m^2, \sigma_f^2, n_m,$ and $n_f$ with $\alpha = `r alpha`$, we calculate the lower and upper bounds. The observed difference in means is `r round(mean_diff, 2)`g. With a critical value of $c_{`r half_alpha`} \approx `r round(z_score, 2)`$, the 95% Confidence Interval is:$$[`r round(ci_lower, 2)`, \quad `r round(ci_upper, 2)`]$$Since this interval does not contain 0, we conclude that the difference in body mass is statistically significant. We can then repeat this analysis across the other species of penguin:{{< pagebreak >}}
 
 ```{r}
-#| label: fig-boxplot
-#| fig-cap: "Distribution of Culmen Depth by Species"
-#| fig-height: 3
+#| label: species-comparison
+#| echo: false
 
-ggplot(df, aes(x = species, y = bill_depth_mm)) +
-  geom_boxplot() +
-  theme_minimal()
+species_stats <- penguins %>%
+  drop_na(body_mass_g, sex) %>%
+  group_by(species, sex) %>%
+  summarise(
+    mean = mean(body_mass_g),
+    var = var(body_mass_g),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = sex, 
+    values_from = c(mean, var, n)
+  )
+
+ci_table <- species_stats %>%
+  mutate(
+    diff = mean_male - mean_female,
+    se = sqrt((var_male / n_male) + (var_female / n_female)),
+    margin = qnorm(0.975) * se,
+    lower = diff - margin,
+    upper = diff + margin
+  ) %>%
+  select(Species = species, `Lower Bound (g)` = lower, `Upper Bound (g)` = upper)
+
+knitr::kable(ci_table, 
+             digits = 2, 
+             caption = "95% Confidence Intervals for Difference in Mean Body Mass (Male - Female) by Species")
 ```
+```{r}
+#| label: fig-ci-plot
+#| fig-cap: "95% Confidence Intervals for the difference in mean body mass (Male - Female). The dashed line at 0 represents the null hypothesis (no difference)."
+#| echo: false
+#| warning: false
+
+# 1. Prepare data for plotting (keeping the raw 'diff' values)
+plot_data <- penguins %>%
+  drop_na(body_mass_g, sex) %>%
+  group_by(species, sex) %>%
+  summarise(
+    mean = mean(body_mass_g),
+    var = var(body_mass_g),
+    n = n(),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(names_from = sex, values_from = c(mean, var, n)) %>%
+  mutate(
+    diff = mean_male - mean_female,
+    se = sqrt((var_male / n_male) + (var_female / n_female)),
+    margin = qnorm(0.975) * se,
+    lower = diff - margin,
+    upper = diff + margin
+  )
+
+# 2. Plot
+ggplot(plot_data, aes(x = species, y = diff, color = species)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2, linewidth = 1) +
+  geom_point(size = 3) +
+  labs(y = "Difference in Mean Mass (g)", 
+       x = "") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### P-Value for Hypothesis Testing
+To formally quantify the strength of evidence against the null hypothesis $H_0: \mu_m - \mu_f = 0$, we calculate the p-value. The p-value represents the probability of observing a difference in means as extreme as, or more extreme than, the one observed in our sample, assuming the null hypothesis is true.The test statistic $Z$ is calculated as:$$Z = \frac{(\hat{\mu}_m - \hat{\mu}_f) - 0}{\sqrt{\frac{\sigma_m^2}{n_m} + \frac{\sigma_f^2}{n_f}}}$$
+
+```{r}
+#| label: calc-pvalue
+#| echo: false
+
+n_m <- nrow(gentoo_m)
+n_f <- nrow(gentoo_f)
+mean_diff <- mean(gentoo_m$body_mass_g) - mean(gentoo_f$body_mass_g)
+se_diff <- sqrt( (var(gentoo_m$body_mass_g)/n_m) + (var(gentoo_f$body_mass_g)/n_f) )
+
+z_stat <- mean_diff / se_diff
+
+p_val <- 2 * (1 - pnorm(abs(z_stat)))
+```
+
+Plugging in our data for the Gentoo penguins:$$Z_{obs} = \frac{`r round(mean_diff, 2)`}{`r round(se_diff, 2)`} \approx `r round(z_stat, 2)`$$This yields a p-value of:$$p = P(|Z| > `r round(z_stat, 2)`) `r format.pval(p_val, eps=0.001)`$$Since $p < 0.05$, we reject the null hypothesis. In fact, the p-value is so small ($\approx1.33*10^{-49}$), that we almost certainly did not incorrectly reject the null hypothesis. The probability of observing such a large difference in body mass by random chance alone is effectively zero.
+
+### Power of the Test
+
+The power function of a hypothesis test, denoted as $\beta(\delta)$, is defined as the probability of rejecting the null hypothesis given a specific value of the true difference $\delta$. High power is desirable when the true parameter lies in the alternative hypothesis region (i.e., $\delta \neq 0$).We calculate the power of our test to detect the observed difference ($\delta = `r round(mean_diff, 2)`$ g) at a significance level of $\alpha = 0.05$. The power is calculated as the probability that the test statistic falls into the rejection region determined by the null hypothesis:$$\beta(\delta) = P\left( Z > c_{\alpha/2} - \frac{\delta}{SE} \right)$$where $SE = \sqrt{\frac{\sigma_m^2}{n_m} + \frac{\sigma_f^2}{n_f}}$ is the standard error of the difference in means.
+
+```{r}
+#| label: calc-power
+#| echo: false
+
+c_alpha_half <- qnorm(1 - 0.05/2)
+
+power_val <- 1 - pnorm(c_alpha_half - (mean_diff / se_diff))
+```
+
+Substituting our values:$$\beta(`r round(mean_diff, 2)`) = P\left( Z > `r round(c_alpha_half, 2)` - \frac{`r round(mean_diff, 2)`}{`r round(se_diff, 2)`} \right) \approx `r round(power_val, 4)`$$The power is approximately 1.0 (or 100%). This confirms that our sample size and the magnitude of sexual dimorphism were more than sufficient to detect the difference. We were virtually guaranteed to reject the null hypothesis given the true biological difference between male and female Gentoo penguins.
+
+# Discussion
+
+It is clear that the conclusion we set out to prove is not only almost certainly true, but also not exclusive to the Gentoo species. Rather, it seems that all three species of penguin observed in the Palmer Archipelago exhibit what zoologists call “sexual dimorphism”, which is a significant difference in size between the sexes of an animal. While this is a universal trait across these penguins, the magnitude varies drastically. Gentoo penguins exhibit the most dimorphism, with males being approximately 800g heavier than females on average. Adelie penguins sit in the middle, with an average difference of about 650g. Chinstrap penguins show the smallest difference: males are only about 400g heavier than females. Importantly, the confidence interval for the mass difference in Chinstrap penguins is relatively lower and has no overlap with the interval for Gentoo penguins nor the interval for Adelie penguins.
+
+This has important consequences. If a significant distinction between the species, these confidence intervals could suggest that biological drivers for size difference may be weaker in Chinstrap penguins compared to penguins of different descent. Moreover, the overlap between the confidence intervals for the Adelie and Gentoo intervals could suggest that, while Gentoo males are much bigger, the magnitude of the mass difference between the sexes is generally closer between these two species.
+
+Our analysis could suggest many evolutionary and environmental hypotheses for the three species of Pygoscelis penguin. Perhaps there is a significant mating advantage in having a large difference in weight for Gentoo penguins -- more so than for Chinstrap penguins but similarly as for Adelie penguins. This could be an indicator to similarity, or lack of similarity, in the origins of each the three species. Perhaps the mass difference is universally significant due to heavier males being able to better protect themselves from predators, so are able to produce more offspring in their lifetime, passing on their heaviness characteristic. Or perhaps there is a different reason for this completely; we know only the correlation, not the causation.
+
+The application of robust statistical frameworks—specifically Maximum Likelihood Estimation (MLE), the Cramér-Rao Lower Bound, and high-power hypothesis testing—ensures our conclusions are grounded in rigorous evidence. While the dataset may harbor deeper correlations that warrant future investigation, the statistical proofs provided here establish a reliable confirmation of the hypothesis we set out to prove.
+
+# Critical Use of AI
+
+Google Gemini was used to assist with the following tasks:
+
+**Installation and Initialisation of RStudio and Quarto:** As I had never used these tools before, I used AI to guide the setup process and ensure the environment was configured correctly.
+
+**Writing Mathematics using LaTeX:** I have rarely used LaTeX previously, so I used AI to assist with the syntax for the mathematical derivations and formulae.
+
+**Explanation of R Syntax:** while my primary resource for learning R was the official documentation, I used AI to help explain specific syntax and translate certain concepts from Python into R.
+
+**Refining Written Communication:** I used AI to polish the clarity and flow of a judicious few of my written explanations, ensuring that my arguments were presented as concisely and professionally as possible. The core analysis and conclusions remain entirely my own.
+
+![The Palmer Archipelago penguins. Artwork by @allison_horst.](threespecies.jpeg){fig-align="center"}
